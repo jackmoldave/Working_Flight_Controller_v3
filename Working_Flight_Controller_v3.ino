@@ -28,11 +28,19 @@
 #define ESC_MIN 62.0
 #define ESC_MAX 113.0
 
-
-
+//Define The Pins
+#define AUX_PIN 0
+#define GEAR_PIN 1
+#define RUDD_PIN 2
+#define ELEV_PIN 3
+#define AIL_PIN 4
+#define THRO_PIN 7
+#define FR_PIN 5
+#define FL_PIN 6
+#define BR_PIN 8
+#define BL_PIN 9
 
 Adafruit_BNO055 bno = Adafruit_BNO055();
-
 
 // Setting up typedef for PID's
 typedef struct {
