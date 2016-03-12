@@ -30,7 +30,7 @@
 #define ESC_MAX 113.0
 
 //Define The Pins
-#define AUX1_PIN 0
+#define AUX1_PIN 0 // get an error when assigning stuff to pin 0
 #define GEAR_PIN 1
 #define RUDD_PIN 2
 #define ELEV_PIN 3
@@ -251,10 +251,10 @@ static uint16_t AUX1_Uninterupted_Value;
   interrupts();
   // Should add a section here that takes values with no interrupts
 
-  RUDD_mapped = map(RUDD_VALUE, RUDD_MIN ,RUDD_MAX,  0, 100);
-  ELEV_mapped = map(ELEV_VALUE, ELEV_MIN ,ELEV_MAX,  0, 100);
-  AILE_mapped = map(AILE_VALUE, AILE_MIN ,AILE_MAX,  0, 100);
-  THRO_mapped = map(THRO_VALUE, THRO_MIN ,THRO_MAX,  100, 0);
+  RUDD_mapped = map(RUDD_Uninterupted_Value, RUDD_MIN ,RUDD_MAX,  0, 100);
+  ELEV_mapped = map(ELEV_Uninterupted_Value, ELEV_MIN ,ELEV_MAX,  0, 100);
+  AILE_mapped = map(AILE_Uninterupted_Value, AILE_MIN ,AILE_MAX,  0, 100);
+  THRO_mapped = map(THRO_Uninterupted_Value, THRO_MIN ,THRO_MAX,  100, 0);
 
 ////////// IMU STUFF \\\\\\\\\\
 
