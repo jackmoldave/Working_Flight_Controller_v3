@@ -13,6 +13,7 @@
 #include <Adafruit_BNO055.h>
 #include <utility/imumaths.h>
 #include <Servo.h>        // Used to control ESC's
+#include <PinChangeInt.h> // Include the PinChangeInt library so that I can access more then 2 pints with interrupts
 
 /* This driver reads raw data from the BNO055
    Connections
@@ -29,16 +30,60 @@
 #define ESC_MAX 113.0
 
 //Define The Pins
-#define AUX_PIN 0
+#define AUX1_PIN 0
 #define GEAR_PIN 1
 #define RUDD_PIN 2
 #define ELEV_PIN 3
-#define AIL_PIN 4
+#define AILE_PIN 4
 #define THRO_PIN 7
 #define FR_PIN 5
 #define FL_PIN 6
 #define BR_PIN 8
 #define BL_PIN 9
+
+// Define min and max values for the radio
+#define RUDD_MAX 1090
+#define RUDD_MIN 1908
+#define ELEV_MAX 1090
+#define ELEV_MIN 1908
+#define AILE_MAX 1090
+#define AILE_MIN 1908
+#define THRO_MAX 1090
+#define THRO_MIN 1908
+
+// Bit flags set to indicate which channels have new signals
+#define AUX1_FLAG 1
+#define GEAR_FLAG 2
+#define RUDD_FLAG 4
+#define ELEV_FLAG 8
+#define AILE_FLAG 16
+#define THRO_FLAG 32
+// The shared flags
+volatile uint16_t Shared_Flags;
+
+// These will hole the actual time values that I get 
+volatile uint16_t AUX1_VALUE;
+volatile uint16_t GEAR_VALUE;
+volatile uint16_t RUDD_VALUE;
+volatile uint16_t ELEV_VALUE;
+volatile uint16_t AILE_VALUE;
+volatile uint16_t THRO_VALUE;
+
+// These are used by the ISR to find the start time
+
+uint32_t StartTime_AUX1;
+uint32_t StartTime_GEAR;
+uint32_t StartTime_RUDD;
+uint32_t StartTime_ELEV;
+uint32_t StartTime_AILE;
+uint32_t StartTime_THRO;
+
+uint16_t RUDD_mapped;
+uint16_t ELEV_mapped;
+uint16_t AILE_mapped;
+uint16_t THRO_mapped;
+
+char temp_text[128];
 
 Adafruit_BNO055 bno = Adafruit_BNO055();
 
@@ -56,6 +101,8 @@ typedef struct {
   double kd;
   } PID_type;
 
+
+
 //initialize rate pids
 PID_type Roll_rate;
 PID_type Pitch_rate;
@@ -72,14 +119,23 @@ Servo FL; // Front Left
 Servo BR; // Back Right
 Servo BL; // Back Left
 
-  
 void setup(void)
 {
   Serial.begin(9600);
+  
+  ////////// Initializing Interrupts \\\\\\\\\\
+  // Attaches the interrupts to the selected pin using the PinChangeInt library
+  PCintPort::attachInterrupt(AUX1_PIN, calculate_AUX1,CHANGE);
+  PCintPort::attachInterrupt(GEAR_PIN, calculate_GEAR,CHANGE);
+  PCintPort::attachInterrupt(RUDD_PIN, calculate_RUDD,CHANGE);
+  PCintPort::attachInterrupt(ELEV_PIN, calculate_ELEV,CHANGE);
+  PCintPort::attachInterrupt(AILE_PIN, calculate_AILE,CHANGE);
+  PCintPort::attachInterrupt(THRO_PIN, calculate_THRO,CHANGE);
+
   ////////// Initializing PID's \\\\\\\\\\
 
-  double Input = 0;   
   double kp = .2;
+  double Input = 0;
   double ki = .1;
   double kd = 0;
   double Sample_time = 200;
@@ -87,6 +143,7 @@ void setup(void)
   Serial.println("Initializing Rate PIDs...");
   Serial.print(" Roll_rate...");
   Roll_rate = initialize_pid(Roll_rate, kp, ki, kd, Sample_time, Setpoint, Input);
+
   Serial.println(" Completed");
   Serial.print(" Pitch_rate...");
   Pitch_rate = initialize_pid(Pitch_rate, kp, ki, kd, Sample_time, Setpoint, Input);
@@ -94,8 +151,6 @@ void setup(void)
   Serial.print(" Yaw_rate...");
   Yaw_rate = initialize_pid(Yaw_rate , kp, ki, kd, Sample_time, Setpoint, Input);
   Serial.println(" Completed");
-  
-  
   Serial.println("Initializing Position PIDs...");
   Serial.print("Roll_rate...");
   Roll_position = initialize_pid(Roll_position, kp, ki, kd, Sample_time, Setpoint, Input);
@@ -108,7 +163,6 @@ void setup(void)
   Serial.print("Yaw_position ...");
   Yaw_position = initialize_pid(Yaw_position, kp, ki, kd, Sample_time, Setpoint, Input);
   Serial.println(" Completed");
-
 
   ////////// Setup IMU \\\\\\\\\\
   Serial.println("Orientation Sensor Raw Data Test"); Serial.println("");
@@ -123,12 +177,13 @@ void setup(void)
   bno.setExtCrystalUse(true);
   Serial.println("Calibration status values: 0=uncalibrated, 3=fully calibrated");
 
+  ////////// Setup Motors and ESC's \\\\\\\\\\
   Serial.print("Setting up motor assignments...");
   // Setup Motor Pin Assignments
-  FR.attach(9);
-  FL.attach(10);
-  BR.attach(11);
-  BL.attach(12);
+  FR.attach(FR_PIN);
+  FL.attach(FL_PIN);
+  BR.attach(BR_PIN);
+  BL.attach(BL_PIN);
   Serial.println("Motor setup complete");
 
   // Printing startup message
@@ -144,6 +199,62 @@ void setup(void)
 
 void loop(void)
 {
+
+static uint16_t AUX1_Uninterupted_Value;
+  static uint16_t GEAR_Uninterupted_Value;
+  static uint16_t RUDD_Uninterupted_Value;
+  static uint16_t ELEV_Uninterupted_Value;
+  static uint16_t AILE_Uninterupted_Value;
+  static uint16_t THRO_Uninterupted_Value;
+  static uint16_t Local_Flags;
+
+  if (Shared_Flags)
+  {
+    ////////// Interrupt Stuff \\\\\\\\\\
+    // Turn off the interupts while we do important shit
+    // Like writing data to write to motors
+    noInterrupts();
+
+    Local_Flags = Shared_Flags;
+
+    if (Local_Flags & AUX1_FLAG)
+    {
+      AUX1_Uninterupted_Value = AUX1_VALUE;
+    }
+
+    if (Local_Flags & GEAR_FLAG)
+    {
+      GEAR_Uninterupted_Value = GEAR_VALUE;
+    }
+
+    if (Local_Flags & RUDD_FLAG)
+    {
+      RUDD_Uninterupted_Value = RUDD_VALUE;
+    }
+
+    if (Local_Flags & ELEV_FLAG)
+    {
+      ELEV_Uninterupted_Value = ELEV_VALUE;
+    }
+
+    if (Local_Flags & AILE_FLAG)
+    {
+      AILE_Uninterupted_Value = AILE_VALUE;
+    }
+
+    if (Local_Flags & THRO_FLAG)
+    {
+      THRO_Uninterupted_Value = THRO_VALUE;
+    }
+  }
+  
+  interrupts();
+  // Should add a section here that takes values with no interrupts
+
+  RUDD_mapped = map(RUDD_VALUE, RUDD_MIN ,RUDD_MAX,  0, 100);
+  ELEV_mapped = map(ELEV_VALUE, ELEV_MIN ,ELEV_MAX,  0, 100);
+  AILE_mapped = map(AILE_VALUE, AILE_MIN ,AILE_MAX,  0, 100);
+  THRO_mapped = map(THRO_VALUE, THRO_MIN ,THRO_MAX,  100, 0);
 
 ////////// IMU STUFF \\\\\\\\\\
 
@@ -165,7 +276,7 @@ void loop(void)
   Roll_rate.Input = gyroscope.y();    //Roll is y axis
   Pitch_rate.Input = gyroscope.z();   // Yaw is x axis
   
-  
+  ////////// Calculate PID's \\\\\\\\\\  
   Roll_position = Compute(Roll_position);
   Yaw_position = Compute(Yaw_position);
   Pitch_position = Compute(Pitch_position);
@@ -179,20 +290,23 @@ void loop(void)
   Yaw_rate = Compute(Yaw_rate);
   Pitch_rate = Compute(Pitch_rate);
   
-  
-
-
-
-
+  ////////// Output Motor Calculations \\\\\\\\\\
 //  motor FL: throttle - roll_output - pitch_output - yaw_output
 //  motor BL: throttle - roll_output + pitch_output _ yaw_output
 //  motor FR: rcthr + roll_output - pitch output + yaw_output
 //  motor BR: rcthr + roll_output + pitch_output - yaw_output
 
-  print_pid(Roll_rate);
+//  print_pid(Roll_rate);
   double FR_val = constrain(map(Roll_rate.Output, 0, 30, ESC_MIN, ESC_MAX),ESC_MIN, ESC_MAX);
+  
   Serial.println(FR_val);
   FR.write(FR_val);
+  
+  if (Shared_Flags > 0)
+  {
+    sprintf(temp_text, "RUDD_VALUE: %4d ELEV_VALUE: %4d AILE_VALUE: %4d THRO_VALUE: %4d", RUDD_mapped, ELEV_mapped, AILE_mapped, THRO_mapped);
+      Serial.println(temp_text);
+  }
 
 ////////  MOTOR STUFF \\\\\\\\\\
 // Writ eto the serveo
@@ -299,3 +413,88 @@ void print_pid(PID_type controller)
   Serial.print(controller.Last_error);
   Serial.println("");
 }
+
+
+void calculate_AUX1()
+{
+  if (digitalRead(AUX1_PIN) == HIGH)
+  {
+    // If the pin is high then it is rising
+    // Start the timer
+    StartTime_AUX1 = micros();
+  }
+  else
+  {
+    // If it isn't rising it must be falling otherwise the interrupt wouldn't be called
+    AUX1_VALUE = (uint16_t)(micros() - StartTime_AUX1);
+    // Sets the new flag to show loop that new signal has been received
+    Shared_Flags = Shared_Flags | AUX1_FLAG;
+  }
+}
+
+
+void calculate_GEAR()
+{
+  if (digitalRead(GEAR_PIN) == HIGH)
+  {
+    StartTime_GEAR = micros();
+  }
+  else
+  {
+    GEAR_VALUE = (uint16_t)(micros() - StartTime_GEAR);
+    Shared_Flags = Shared_Flags | GEAR_FLAG;
+  }
+}
+
+void calculate_RUDD()
+{
+  if (digitalRead(RUDD_PIN) == HIGH)
+  {
+    StartTime_RUDD = micros();
+  }
+  else
+  {
+    RUDD_VALUE = (uint16_t)(micros() - StartTime_RUDD);
+    Shared_Flags = Shared_Flags | RUDD_FLAG;
+  }
+}
+
+void calculate_ELEV()
+{
+  if (digitalRead(ELEV_PIN) == HIGH)
+  {
+    StartTime_ELEV = micros();
+  }
+  else
+  {
+    ELEV_VALUE = (uint16_t)(micros() - StartTime_ELEV);
+    Shared_Flags = Shared_Flags | ELEV_FLAG;
+  }
+}
+
+void calculate_AILE()
+{
+  if (digitalRead(AILE_PIN) == HIGH)
+  {
+    StartTime_AILE = micros();
+  }
+  else
+  {
+    AILE_VALUE = (uint16_t)(micros() - StartTime_AILE);
+    Shared_Flags = Shared_Flags | AILE_FLAG;
+  }
+}
+
+void calculate_THRO()
+{
+  if (digitalRead(THRO_PIN) == HIGH)
+  {
+    StartTime_THRO = micros();
+  }
+  else
+  {
+    THRO_VALUE = (uint16_t)(micros() - StartTime_THRO);
+    Shared_Flags = Shared_Flags | THRO_FLAG;
+  }
+}
+
