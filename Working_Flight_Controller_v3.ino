@@ -78,10 +78,10 @@ uint32_t StartTime_ELEV;
 uint32_t StartTime_AILE;
 uint32_t StartTime_THRO;
 
-uint16_t RUDD_mapped;
-uint16_t ELEV_mapped;
-uint16_t AILE_mapped;
-uint16_t THRO_mapped;
+double RUDD_mapped;
+double ELEV_mapped;
+double AILE_mapped;
+double THRO_mapped;
 
 char temp_text[128];
 
@@ -100,8 +100,6 @@ typedef struct {
   double ki;
   double kd;
   } PID_type;
-
-
 
 //initialize rate pids
 PID_type Roll_rate;
@@ -200,7 +198,7 @@ void setup(void)
 void loop(void)
 {
 
-static uint16_t AUX1_Uninterupted_Value;
+  static uint16_t AUX1_Uninterupted_Value;
   static uint16_t GEAR_Uninterupted_Value;
   static uint16_t RUDD_Uninterupted_Value;
   static uint16_t ELEV_Uninterupted_Value;
@@ -251,13 +249,14 @@ static uint16_t AUX1_Uninterupted_Value;
   interrupts();
   // Should add a section here that takes values with no interrupts
 
-  RUDD_mapped = map(RUDD_Uninterupted_Value, RUDD_MIN ,RUDD_MAX,  0, 100);
-  ELEV_mapped = map(ELEV_Uninterupted_Value, ELEV_MIN ,ELEV_MAX,  0, 100);
-  AILE_mapped = map(AILE_Uninterupted_Value, AILE_MIN ,AILE_MAX,  0, 100);
-  THRO_mapped = map(THRO_Uninterupted_Value, THRO_MIN ,THRO_MAX,  100, 0);
+// map the valus. probably don't need this right now. 
+
+  RUDD_mapped = map(RUDD_Uninterupted_Value, RUDD_MIN ,RUDD_MAX, -180, 180); // Yaw
+  ELEV_mapped = map(ELEV_Uninterupted_Value, ELEV_MIN ,ELEV_MAX, 45, -45); // Pitch
+  AILE_mapped = map(AILE_Uninterupted_Value, AILE_MIN ,AILE_MAX, 45, -45); // Roll
+  THRO_mapped = map(THRO_Uninterupted_Value, THRO_MIN ,THRO_MAX,  50, 0);  // Elevation
 
 ////////// IMU STUFF \\\\\\\\\\
-
   // Possible vector values can be:
   // - VECTOR_ACCELEROMETER - m/s^2
   // - VECTOR_MAGNETOMETER  - uT
@@ -265,6 +264,7 @@ static uint16_t AUX1_Uninterupted_Value;
   // - VECTOR_EULER         - degrees
   // - VECTOR_LINEARACCEL   - m/s^2
   // - VECTOR_GRAVITY       - m/s^2
+
   imu::Vector<3> euler = bno.getVector(Adafruit_BNO055::VECTOR_EULER);
   imu::Vector<3> gyroscope = bno.getVector(Adafruit_BNO055::VECTOR_GYROSCOPE);
 
@@ -272,39 +272,43 @@ static uint16_t AUX1_Uninterupted_Value;
   Roll_position.Input = euler.y();    //Roll is y axis
   Pitch_position.Input = euler.z();   // Yaw is x axis
 
-  Yaw_rate.Input = gyroscope.x();     //Pitch is z axis
-  Roll_rate.Input = gyroscope.y();    //Roll is y axis
-  Pitch_rate.Input = gyroscope.z();   // Yaw is x axis
-  
+  // Use when I do cascading PID
+  // Yaw_rate.Input = gyroscope.x();     //Pitch is z axis
+  // Roll_rate.Input = gyroscope.y();    //Roll is y axis\\\\\\\\\\\\\\\\\\\\\\
+  // Pitch_rate.Input = gyroscope.z();   // Yaw is x axis
   ////////// Calculate PID's \\\\\\\\\\  
+  // setpoint for stability PID's
   
-  Roll_position.Setpoint = THRO_mapped;
-//  Serial.println(Roll_position.Setpoint);
-  
+  Roll_position.Setpoint =  AILE_mapped;
+  Yaw_position.Setpoint = RUDD_mapped;
+  Pitch_position.Setpoint = ELEV_mapped;
+
   Roll_position = Compute(Roll_position);
   Yaw_position = Compute(Yaw_position);
   Pitch_position = Compute(Pitch_position);
 
-  
-  Roll_rate.Setpoint = Roll_position.Output;
-  Pitch_rate.Setpoint= Pitch_position.Output;
-  Yaw_rate.Setpoint = Yaw_position.Output;
+  // Roll_rate.Setpoint = Roll_position.Output;
+  // Pitch_rate.Setpoint= Pitch_position.Output;
+  // Yaw_rate.Setpoint = Yaw_position.Output;
 
-  Roll_rate = Compute(Roll_rate);
-  Yaw_rate = Compute(Yaw_rate);
-  Pitch_rate = Compute(Pitch_rate);
-  
+  // Roll_rate = Compute(Roll_rate);
+  // Yaw_rate = Compute(Yaw_rate);
+  // Pitch_rate = Compute(Pitch_rate);
+
   ////////// Output Motor Calculations \\\\\\\\\\
-//  motor FL: throttle - roll_output - pitch_output - yaw_output
-//  motor BL: throttle - roll_output + pitch_output _ yaw_output
-//  motor FR: rcthr + roll_output - pitch output + yaw_output
-//  motor BR: rcthr + roll_output + pitch_output - yaw_output
+  
+  double BL_value = (THRO_mapped - Roll_position.Output + Pitch_position.Output + Yaw_position.Output);
+  double FR_value = (THRO_mapped + Roll_position.Output - Pitch_position.Output + Yaw_position.Output);
+  double BR_value = (THRO_mapped + Roll_position.Output + Pitch_position.Output - Yaw_position.Output);
+  double FL_value = (THRO_mapped - Roll_position.Output - Pitch_position.Output - Yaw_position.Output);
+  
+  FL.write(constrain(FL_value, ESC_MIN, ESC_MAX));
+  BL.write(constrain(BL_value, ESC_MIN, ESC_MAX));
+  FR.write(constrain(FR_value, ESC_MIN, ESC_MAX));
+  BR.write(constrain(BR_value, ESC_MIN, ESC_MAX));
 
-  print_pid(Roll_rate);
-//  double FR_val = constrain(map(Roll_rate.Output, 0, 30, ESC_MIN, ESC_MAX),ESC_MIN, ESC_MAX);
-//  
-//  Serial.println(FR_val);
-//  FR.write(FR_val);
+//  print_pid(Roll_rate);
+ // double FR_val = constrain(map(Roll_rate.Output, 0, 30, ESC_MIN, ESC_MAX),ESC_MIN, ESC_MAX);
   
 //  if (Shared_Flags > 0)
 //  {
@@ -312,18 +316,9 @@ static uint16_t AUX1_Uninterupted_Value;
 //      Serial.println(temp_text);
 //  }
 
-////////  MOTOR STUFF \\\\\\\\\\
-// Writ eto the serveo
-//FR.write(val);
-//FL.write(val);
-//BR.write(val);
-//BL.write(val);
-  
-  // print the absolute angle and the angle acceleration
-  // print_IMU(euler, GYROSCOPE);
-  // Print the PID values
-//  print_pid(Roll_position);
-//  Serial.println(Roll_position.Last_time);
+// Print Commands
+// print_IMU(euler, GYROSCOPE);
+ print_pid(Roll_position);
 
 }
 
