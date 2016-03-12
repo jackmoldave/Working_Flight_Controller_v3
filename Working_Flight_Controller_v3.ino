@@ -297,17 +297,26 @@ void loop(void)
 
   ////////// Output Motor Calculations \\\\\\\\\\
   
-  double BL_value = (THRO_mapped - Roll_position.Output + Pitch_position.Output + Yaw_position.Output);
-  double FR_value = (THRO_mapped + Roll_position.Output - Pitch_position.Output + Yaw_position.Output);
-  double BR_value = (THRO_mapped + Roll_position.Output + Pitch_position.Output - Yaw_position.Output);
-  double FL_value = (THRO_mapped - Roll_position.Output - Pitch_position.Output - Yaw_position.Output);
+  double BL_value = (THRO_mapped - Roll_position.Output + Pitch_position.Output); // + Yaw_position.Output
+  double FR_value = (THRO_mapped + Roll_position.Output - Pitch_position.Output); // + Yaw_position.Output
+  double BR_value = (THRO_mapped + Roll_position.Output + Pitch_position.Output); // - Yaw_position.Output
+  double FL_value = (THRO_mapped - Roll_position.Output - Pitch_position.Output); // - Yaw_position.Output
+  FL_value = map(FL_value, -45, 45, ESC_MIN, ESC_MAX);
+  FL_value = constrain(FL_value, ESC_MIN, ESC_MAX); 
   
-  FL.write(constrain(FL_value, ESC_MIN, ESC_MAX));
-  BL.write(constrain(BL_value, ESC_MIN, ESC_MAX));
-  FR.write(constrain(FR_value, ESC_MIN, ESC_MAX));
-  BR.write(constrain(BR_value, ESC_MIN, ESC_MAX));
+  FR_value = map(FL_value, -45, 45, ESC_MIN, ESC_MAX);
+  FR_value = constrain(FL_value, ESC_MIN, ESC_MAX); 
+    
+  FL.write(FL_value);
+  FR.write(FR_value);
+//  Serial.print("Motor_Value");
+//  Serial.println(FL_value);
+  
+//  BL.write(constrain(BL_value, ESC_MIN, ESC_MAX));
+//  FR.write(constrain(FR_value, ESC_MIN, ESC_MAX));
+//  BR.write(constrain(BR_value, ESC_MIN, ESC_MAX));
 
-//  print_pid(Roll_rate);
+  print_pid(Roll_position);
  // double FR_val = constrain(map(Roll_rate.Output, 0, 30, ESC_MIN, ESC_MAX),ESC_MIN, ESC_MAX);
   
 //  if (Shared_Flags > 0)
@@ -318,7 +327,7 @@ void loop(void)
 
 // Print Commands
 // print_IMU(euler, GYROSCOPE);
- print_pid(Roll_position);
+// print_pid(Roll_position);
 
 }
 
