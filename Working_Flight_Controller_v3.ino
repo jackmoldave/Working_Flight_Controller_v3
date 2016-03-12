@@ -277,6 +277,10 @@ static uint16_t AUX1_Uninterupted_Value;
   Pitch_rate.Input = gyroscope.z();   // Yaw is x axis
   
   ////////// Calculate PID's \\\\\\\\\\  
+  
+  Roll_position.Setpoint = THRO_mapped;
+//  Serial.println(Roll_position.Setpoint);
+  
   Roll_position = Compute(Roll_position);
   Yaw_position = Compute(Yaw_position);
   Pitch_position = Compute(Pitch_position);
@@ -296,17 +300,17 @@ static uint16_t AUX1_Uninterupted_Value;
 //  motor FR: rcthr + roll_output - pitch output + yaw_output
 //  motor BR: rcthr + roll_output + pitch_output - yaw_output
 
-//  print_pid(Roll_rate);
-  double FR_val = constrain(map(Roll_rate.Output, 0, 30, ESC_MIN, ESC_MAX),ESC_MIN, ESC_MAX);
+  print_pid(Roll_rate);
+//  double FR_val = constrain(map(Roll_rate.Output, 0, 30, ESC_MIN, ESC_MAX),ESC_MIN, ESC_MAX);
+//  
+//  Serial.println(FR_val);
+//  FR.write(FR_val);
   
-  Serial.println(FR_val);
-  FR.write(FR_val);
-  
-  if (Shared_Flags > 0)
-  {
-    sprintf(temp_text, "RUDD_VALUE: %4d ELEV_VALUE: %4d AILE_VALUE: %4d THRO_VALUE: %4d", RUDD_mapped, ELEV_mapped, AILE_mapped, THRO_mapped);
-      Serial.println(temp_text);
-  }
+//  if (Shared_Flags > 0)
+//  {
+//    sprintf(temp_text, "RUDD_VALUE: %4d ELEV_VALUE: %4d AILE_VALUE: %4d THRO_VALUE: %4d", RUDD_mapped, ELEV_mapped, AILE_mapped, THRO_mapped);
+//      Serial.println(temp_text);
+//  }
 
 ////////  MOTOR STUFF \\\\\\\\\\
 // Writ eto the serveo
