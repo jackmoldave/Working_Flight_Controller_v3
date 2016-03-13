@@ -1,5 +1,5 @@
 //Parts of the flight controller:
-//
+// single pid
 //Interrupts / radio reading
 //PID - theoreticlaly working
 //Motor writing
