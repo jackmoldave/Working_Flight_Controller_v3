@@ -146,6 +146,13 @@ void setup(void)
     Serial.print("Ooops, no BNO055 detected ... Check your wiring or I2C ADDR!");
     while(1);
   }
+
+  // Get first set of coordinates from IMU
+  imu::Vector<3> euler = bno.getVector(Adafruit_BNO055::VECTOR_EULER);
+  imu::Vector<3> gyroscope = bno.getVector(Adafruit_BNO055::VECTOR_GYROSCOPE);
+  // Set that yaw position as the first position
+  Yaw_position.Setpoint = euler.z();   // Yaw is x axis 
+
   delay(1000);
   bno.setExtCrystalUse(true);
   Serial.println("Calibration status values: 0=uncalibrated, 3=fully calibrated");
@@ -261,6 +268,7 @@ void loop(void)
   double FR_value = (THRO_mapped + Roll_position.Output - Pitch_position.Output) + Yaw_position.Output;
   double BR_value = (THRO_mapped + Roll_position.Output + Pitch_position.Output) - Yaw_position.Output;
   double FL_value = (THRO_mapped - Roll_position.Output - Pitch_position.Output) - Yaw_position.Output; 
+  
   FL_value = map(FL_value, -45, 45, ESC_MIN, ESC_MAX);
   FL_value = constrain(FL_value, ESC_MIN, ESC_MAX); 
   
