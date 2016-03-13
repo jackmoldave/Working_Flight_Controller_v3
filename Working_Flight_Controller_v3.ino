@@ -257,10 +257,10 @@ void loop(void)
 
   ////////// Output Motor Calculations \\\\\\\\\\
   
-  double BL_value = (THRO_mapped - Roll_position.Output + Pitch_position.Output); // + Yaw_position.Output
-  double FR_value = (THRO_mapped + Roll_position.Output - Pitch_position.Output); // + Yaw_position.Output
-  double BR_value = (THRO_mapped + Roll_position.Output + Pitch_position.Output); // - Yaw_position.Output
-  double FL_value = (THRO_mapped - Roll_position.Output - Pitch_position.Output); // - Yaw_position.Output
+  double BL_value = (THRO_mapped - Roll_position.Output + Pitch_position.Output) + Yaw_position.Output;
+  double FR_value = (THRO_mapped + Roll_position.Output - Pitch_position.Output) + Yaw_position.Output;
+  double BR_value = (THRO_mapped + Roll_position.Output + Pitch_position.Output) - Yaw_position.Output;
+  double FL_value = (THRO_mapped - Roll_position.Output - Pitch_position.Output) - Yaw_position.Output; 
   FL_value = map(FL_value, -45, 45, ESC_MIN, ESC_MAX);
   FL_value = constrain(FL_value, ESC_MIN, ESC_MAX); 
   
