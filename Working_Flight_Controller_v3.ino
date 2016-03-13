@@ -35,14 +35,14 @@
 #define BL_PIN 9
 
 // Define min and max values for the radio
-#define RUDD_MAX 1090
-#define RUDD_MIN 1908
-#define ELEV_MAX 1090
-#define ELEV_MIN 1908
-#define AILE_MAX 1090
-#define AILE_MIN 1908
-#define THRO_MAX 1090
-#define THRO_MIN 1908
+#define RUDD_MAX 1908
+#define RUDD_MIN 1090
+#define ELEV_MAX 1908
+#define ELEV_MIN 1090
+#define AILE_MAX 1908
+#define AILE_MIN 1090
+#define THRO_MIN 1090
+#define THRO_MAX 1908
 
 // Bit flags set to indicate which channels have new signals
 #define AUX1_FLAG 1
@@ -119,12 +119,13 @@ void setup(void)
   PCintPort::attachInterrupt(THRO_PIN, calculate_THRO,CHANGE);
 
   ////////// Initializing PID's \\\\\\\\\\
+
   double kp = .2;
-  double Input = 0;
   double ki = .1;
   double kd = 0;
   double Sample_time = 200;
   double Setpoint = 0;
+  double Input = 0;
   Serial.println("Initializing Position PIDs...");
   
   Serial.print("Roll_position...");
@@ -179,7 +180,7 @@ void setup(void)
 
 void loop(void)
 {
-  ////////// Interrupt Stuff \\\\\\\\\\
+  ////////// Interrupt Stuff
   static uint16_t AUX1_Uninterupted_Value;
   static uint16_t GEAR_Uninterupted_Value;
   static uint16_t RUDD_Uninterupted_Value;
@@ -199,6 +200,7 @@ void loop(void)
 
     if (Local_Flags & AUX1_FLAG)
     {
+
       AUX1_Uninterupted_Value = AUX1_VALUE;
     }
 
@@ -233,7 +235,7 @@ void loop(void)
   RUDD_mapped = map(RUDD_Uninterupted_Value, RUDD_MIN ,RUDD_MAX, -180, 180); // Yaw
   ELEV_mapped = map(ELEV_Uninterupted_Value, ELEV_MIN ,ELEV_MAX, 45, -45); // Pitch
   AILE_mapped = map(AILE_Uninterupted_Value, AILE_MIN ,AILE_MAX, 45, -45); // Roll
-  THRO_mapped = map(THRO_Uninterupted_Value, THRO_MIN ,THRO_MAX,  100, 0);  // Elevation
+  THRO_mapped = map(THRO_Uninterupted_Value, THRO_MIN ,THRO_MAX, ESC_MAX - 10, ESC_MIN);  // Elevation
 
   ////////// IMU STUFF \\\\\\\\\\
   // Possible vector values can be:
@@ -243,7 +245,6 @@ void loop(void)
   // - VECTOR_EULER         - degrees
   // - VECTOR_LINEARACCEL   - m/s^2
   // - VECTOR_GRAVITY       - m/s^2
-  // git test
 
   imu::Vector<3> euler = bno.getVector(Adafruit_BNO055::VECTOR_EULER);
   imu::Vector<3> gyroscope = bno.getVector(Adafruit_BNO055::VECTOR_GYROSCOPE);
@@ -251,7 +252,6 @@ void loop(void)
   Yaw_position.Input = euler.x();     //Pitch is z axis
   Roll_position.Input = euler.y();    //Roll is y axis
   Pitch_position.Input = euler.z();   // Yaw is x axis
-
 
   ////////// Calculate PID's \\\\\\\\\\  
   // setpoint for stability PID's
@@ -265,29 +265,28 @@ void loop(void)
 
   ////////// Output Motor Calculations \\\\\\\\\\
   
-  double BL_value = (THRO_mapped - Roll_position.Output + Pitch_position.Output) + Yaw_position.Output;
-  double FR_value = (THRO_mapped + Roll_position.Output - Pitch_position.Output) + Yaw_position.Output;
-  double BR_value = (THRO_mapped + Roll_position.Output + Pitch_position.Output) - Yaw_position.Output;
-  double FL_value = (THRO_mapped - Roll_position.Output - Pitch_position.Output) - Yaw_position.Output; 
+  double BL_value = (THRO_mapped - Roll_position.Output + Pitch_position.Output + Yaw_position.Output);
+  double FR_value = (THRO_mapped + Roll_position.Output - Pitch_position.Output + Yaw_position.Output);
+  double BR_value = (THRO_mapped + Roll_position.Output + Pitch_position.Output - Yaw_position.Output);
+  double FL_value = (THRO_mapped - Roll_position.Output - Pitch_position.Output - Yaw_position.Output); 
   
-  FL_value = map(FL_value, -45, 45, ESC_MIN, ESC_MAX);
-  FL_value = constrain(FL_value, ESC_MIN, ESC_MAX); 
-  
-  FR_value = map(FL_value, -45, 45, ESC_MIN, ESC_MAX);
-  FR_value = constrain(FL_value, ESC_MIN, ESC_MAX); 
-    
-  FL.write(FL_value);
-  FR.write(FR_value);
-//  Serial.print("Motor_Value");
-//  Serial.println(FL_value);
-  
-//  BL.write(constrain(BL_value, ESC_MIN, ESC_MAX));
-//  FR.write(constrain(FR_value, ESC_MIN, ESC_MAX));
-//  BR.write(constrain(BR_value, ESC_MIN, ESC_MAX));
+  BL_value = constrain(BL_value, ESC_MIN, ESC_MAX);
+  FR_value = constrain(FR_value, ESC_MIN, ESC_MAX);
+  BR_value = constrain(BR_value, ESC_MIN, ESC_MAX);
+  FL_value = constrain(FL_value, ESC_MIN, ESC_MAX);
+
+  if (THRO_Uninterupted_Value > THRO_MIN + 100)
+  {
+    FL.write(FL_value);
+    FR.write(FR_value);
+    BR.write(BR_value);
+    BL.write(BL_value);
+    sprintf(temp_text, "FL: %4d FR: %4d BR: %4d BL: %4d", (int)FL_value, (int)FR_value, (int)BR_value, (int)BL_value);
+    Serial.println(temp_text);
+  }
 
   print_pid(Roll_position);
- // double FR_val = constrain(map(Roll_rate.Output, 0, 30, ESC_MIN, ESC_MAX),ESC_MIN, ESC_MAX);
-  
+
 //  if (Shared_Flags > 0)
 //  {
 //    sprintf(temp_text, "RUDD_VALUE: %4d ELEV_VALUE: %4d AILE_VALUE: %4d THRO_VALUE: %4d", RUDD_mapped, ELEV_mapped, AILE_mapped, THRO_mapped);
