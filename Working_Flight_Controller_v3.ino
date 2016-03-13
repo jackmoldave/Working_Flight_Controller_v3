@@ -1,11 +1,4 @@
-//Parts of the flight controller:
-// single pid
-//Interrupts / radio reading
-//PID - theoreticlaly working
-//Motor writing
-//Reading IMU - theoretically working
-
-//time to put the motor writting into this
+// SINGLE PID FLIGHT CONTROLLER
 
 //Libraries for the reading the IMU
 #include <Wire.h>
@@ -101,11 +94,6 @@ typedef struct {
   double kd;
   } PID_type;
 
-//initialize rate pids
-PID_type Roll_rate;
-PID_type Pitch_rate;
-PID_type Yaw_rate;
-
 //initialize position pids
 PID_type Roll_position;
 PID_type Pitch_position;
@@ -137,17 +125,6 @@ void setup(void)
   double kd = 0;
   double Sample_time = 200;
   double Setpoint = 0;
-  Serial.println("Initializing Rate PIDs...");
-  Serial.print(" Roll_rate...");
-  Roll_rate = initialize_pid(Roll_rate, kp, ki, kd, Sample_time, Setpoint, Input);
-
-  Serial.println(" Completed");
-  Serial.print(" Pitch_rate...");
-  Pitch_rate = initialize_pid(Pitch_rate, kp, ki, kd, Sample_time, Setpoint, Input);
-  Serial.println(" Completed");
-  Serial.print(" Yaw_rate...");
-  Yaw_rate = initialize_pid(Yaw_rate , kp, ki, kd, Sample_time, Setpoint, Input);
-  Serial.println(" Completed");
   Serial.println("Initializing Position PIDs...");
   
   Serial.print("Roll_position...");
@@ -195,7 +172,7 @@ void setup(void)
 
 void loop(void)
 {
-
+  ////////// Interrupt Stuff \\\\\\\\\\
   static uint16_t AUX1_Uninterupted_Value;
   static uint16_t GEAR_Uninterupted_Value;
   static uint16_t RUDD_Uninterupted_Value;
@@ -206,7 +183,7 @@ void loop(void)
 
   if (Shared_Flags)
   {
-    ////////// Interrupt Stuff \\\\\\\\\\
+ 
     // Turn off the interupts while we do important shit
     // Like writing data to write to motors
     noInterrupts();
@@ -245,16 +222,13 @@ void loop(void)
   }
   
   interrupts();
-  // Should add a section here that takes values with no interrupts
-
-// map the valus. probably don't need this right now. 
 
   RUDD_mapped = map(RUDD_Uninterupted_Value, RUDD_MIN ,RUDD_MAX, -180, 180); // Yaw
   ELEV_mapped = map(ELEV_Uninterupted_Value, ELEV_MIN ,ELEV_MAX, 45, -45); // Pitch
   AILE_mapped = map(AILE_Uninterupted_Value, AILE_MIN ,AILE_MAX, 45, -45); // Roll
   THRO_mapped = map(THRO_Uninterupted_Value, THRO_MIN ,THRO_MAX,  100, 0);  // Elevation
 
-////////// IMU STUFF \\\\\\\\\\
+  ////////// IMU STUFF \\\\\\\\\\
   // Possible vector values can be:
   // - VECTOR_ACCELEROMETER - m/s^2
   // - VECTOR_MAGNETOMETER  - uT
@@ -270,11 +244,6 @@ void loop(void)
   Roll_position.Input = euler.y();    //Roll is y axis
   Pitch_position.Input = euler.z();   // Yaw is x axis
 
-  // Use when I do cascading PID
-  // Yaw_rate.Input = gyroscope.x();     //Pitch is z axis
-  // Roll_rate.Input = gyroscope.y();    //Roll is y axis\\\\\\\\\\\\\\\\\\\\\\
-  // Pitch_rate.Input = gyroscope.z();   // Yaw is x axis
-  
 
   ////////// Calculate PID's \\\\\\\\\\  
   // setpoint for stability PID's
@@ -285,14 +254,6 @@ void loop(void)
   Roll_position = Compute(Roll_position);
   Yaw_position = Compute(Yaw_position);
   Pitch_position = Compute(Pitch_position);
-
-  // Roll_rate.Setpoint = Roll_position.Output;
-  // Pitch_rate.Setpoint= Pitch_position.Output;
-  // Yaw_rate.Setpoint = Yaw_position.Output;
-
-  // Roll_rate = Compute(Roll_rate);
-  // Yaw_rate = Compute(Yaw_rate);
-  // Pitch_rate = Compute(Pitch_rate);
 
   ////////// Output Motor Calculations \\\\\\\\\\
   
