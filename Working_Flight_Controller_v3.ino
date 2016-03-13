@@ -131,7 +131,6 @@ void setup(void)
   PCintPort::attachInterrupt(THRO_PIN, calculate_THRO,CHANGE);
 
   ////////// Initializing PID's \\\\\\\\\\
-
   double kp = .2;
   double Input = 0;
   double ki = .1;
@@ -150,14 +149,13 @@ void setup(void)
   Yaw_rate = initialize_pid(Yaw_rate , kp, ki, kd, Sample_time, Setpoint, Input);
   Serial.println(" Completed");
   Serial.println("Initializing Position PIDs...");
-  Serial.print("Roll_rate...");
+  
+  Serial.print("Roll_position...");
   Roll_position = initialize_pid(Roll_position, kp, ki, kd, Sample_time, Setpoint, Input);
   Serial.println("Completed");
-  
-  Serial.print("Pitch_rate...");
+  Serial.print("Pitch_position...");
   Pitch_position = initialize_pid(Pitch_position, kp, ki, kd, Sample_time, Setpoint, Input);
   Serial.println("Completed");
-  
   Serial.print("Yaw_position ...");
   Yaw_position = initialize_pid(Yaw_position, kp, ki, kd, Sample_time, Setpoint, Input);
   Serial.println(" Completed");
@@ -254,7 +252,7 @@ void loop(void)
   RUDD_mapped = map(RUDD_Uninterupted_Value, RUDD_MIN ,RUDD_MAX, -180, 180); // Yaw
   ELEV_mapped = map(ELEV_Uninterupted_Value, ELEV_MIN ,ELEV_MAX, 45, -45); // Pitch
   AILE_mapped = map(AILE_Uninterupted_Value, AILE_MIN ,AILE_MAX, 45, -45); // Roll
-  THRO_mapped = map(THRO_Uninterupted_Value, THRO_MIN ,THRO_MAX,  50, 0);  // Elevation
+  THRO_mapped = map(THRO_Uninterupted_Value, THRO_MIN ,THRO_MAX,  100, 0);  // Elevation
 
 ////////// IMU STUFF \\\\\\\\\\
   // Possible vector values can be:
@@ -276,9 +274,10 @@ void loop(void)
   // Yaw_rate.Input = gyroscope.x();     //Pitch is z axis
   // Roll_rate.Input = gyroscope.y();    //Roll is y axis\\\\\\\\\\\\\\\\\\\\\\
   // Pitch_rate.Input = gyroscope.z();   // Yaw is x axis
+  
+
   ////////// Calculate PID's \\\\\\\\\\  
   // setpoint for stability PID's
-  
   Roll_position.Setpoint =  AILE_mapped;
   Yaw_position.Setpoint = RUDD_mapped;
   Pitch_position.Setpoint = ELEV_mapped;
@@ -505,4 +504,3 @@ void calculate_THRO()
     Shared_Flags = Shared_Flags | THRO_FLAG;
   }
 }
-
