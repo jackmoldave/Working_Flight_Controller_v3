@@ -31,8 +31,8 @@
 #define THRO_PIN 7
 #define FR_PIN 5
 #define FL_PIN 6
-#define BR_PIN 8
-#define BL_PIN 9
+#define BR_PIN 9
+#define BL_PIN 10
 
 // Define min and max values for the radio
 #define RUDD_MAX 1908
@@ -235,7 +235,7 @@ void loop(void)
   RUDD_mapped = map(RUDD_Uninterupted_Value, RUDD_MIN ,RUDD_MAX, -180, 180); // Yaw
   ELEV_mapped = map(ELEV_Uninterupted_Value, ELEV_MIN ,ELEV_MAX, 45, -45); // Pitch
   AILE_mapped = map(AILE_Uninterupted_Value, AILE_MIN ,AILE_MAX, 45, -45); // Roll
-  THRO_mapped = map(THRO_Uninterupted_Value, THRO_MIN ,THRO_MAX, ESC_MAX - 10, ESC_MIN);  // Elevation
+  THRO_mapped = map(THRO_Uninterupted_Value, THRO_MIN ,THRO_MAX, ESC_MIN, ESC_MAX - 10);  // Elevation
 
   ////////// IMU STUFF \\\\\\\\\\
   // Possible vector values can be:
@@ -270,11 +270,12 @@ void loop(void)
   double BR_value = (THRO_mapped + Roll_position.Output + Pitch_position.Output - Yaw_position.Output);
   double FL_value = (THRO_mapped - Roll_position.Output - Pitch_position.Output - Yaw_position.Output); 
   
-  BL_value = constrain(BL_value, ESC_MIN, ESC_MAX);
-  FR_value = constrain(FR_value, ESC_MIN, ESC_MAX);
-  BR_value = constrain(BR_value, ESC_MIN, ESC_MAX);
-  FL_value = constrain(FL_value, ESC_MIN, ESC_MAX);
+  BL_value = constrain(BL_value, ESC_MIN + 2, ESC_MAX);
+  FR_value = constrain(FR_value, ESC_MIN + 2, ESC_MAX);
+  BR_value = constrain(BR_value, ESC_MIN + 2, ESC_MAX);
+  FL_value = constrain(FL_value, ESC_MIN + 2, ESC_MAX);
 
+//  Serial.println(THRO_Uninterupted_Value);
   if (THRO_Uninterupted_Value > THRO_MIN + 100)
   {
     FL.write(FL_value);
@@ -284,8 +285,16 @@ void loop(void)
     sprintf(temp_text, "FL: %4d FR: %4d BR: %4d BL: %4d", (int)FL_value, (int)FR_value, (int)BR_value, (int)BL_value);
     Serial.println(temp_text);
   }
+  else
+  {
+    FL.write(ESC_MIN - 5);
+    FR.write(ESC_MIN - 5);
+    BR.write(ESC_MIN - 5);
+    BL.write(ESC_MIN - 5);
+  }
+  
 
-  print_pid(Roll_position);
+//  print_pid(Roll_position);
 
 //  if (Shared_Flags > 0)
 //  {
